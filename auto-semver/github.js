@@ -1,22 +1,5 @@
-// The GitHub REST calls auto-semver makes, through an injectable request
-// function so tests can fake them.
-
-/** A request function for the REST API: request(path) resolves to
- * { status, json, headers }. Only 2xx and 404 resolve; anything else throws. */
-export function restClient({ token, apiUrl = "https://api.github.com", fetchImpl = fetch }) {
-  return async (path) => {
-    const res = await fetchImpl(apiUrl + path, {
-      headers: {
-        Accept: "application/vnd.github+json",
-        Authorization: `Bearer ${token}`,
-        "X-GitHub-Api-Version": "2022-11-28",
-      },
-    });
-    if (res.status === 404) return { status: 404, json: null, headers: res.headers };
-    if (!res.ok) throw new Error(`GitHub API ${path}: ${res.status} ${await res.text()}`);
-    return { status: res.status, json: await res.json(), headers: res.headers };
-  };
-}
+// The GitHub REST calls auto-semver makes, through a request function
+// (shared/rest.js) that tests can fake.
 
 /** Every release tag (vX.Y.Z), lowest first, with the commit it points at. */
 export async function fetchReleaseTags(request, repo, parseTag, compareVersions) {

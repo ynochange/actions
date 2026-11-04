@@ -17,12 +17,10 @@ jobs:
     steps:
       - id: semver
         uses: ynochange/actions/auto-semver@<commit sha>
-      - uses: actions/checkout@v4
-        if: steps.semver.outputs.tag != ''
       - if: steps.semver.outputs.tag != ''
-        run: |
-          git tag "${{ steps.semver.outputs.tag }}"
-          git push origin "${{ steps.semver.outputs.tag }}"
+        uses: ynochange/actions/tag@<commit sha>
+        with:
+          tags: ${{ steps.semver.outputs.tag }}
 ```
 
 ## Inputs

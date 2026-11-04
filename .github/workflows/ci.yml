@@ -16,20 +16,3 @@ jobs:
         with:
           node-version: "24"
       - run: npm test
-
-  # Every push to main that passes is released, versioned by auto-semver
-  # itself, from this commit's copy.
-  release:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: test
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-      - id: semver
-        uses: ./auto-semver
-      - if: steps.semver.outputs.tag != ''
-        run: |
-          git tag "${{ steps.semver.outputs.tag }}"
-          git push origin "${{ steps.semver.outputs.tag }}"

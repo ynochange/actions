@@ -1,0 +1,21 @@
+name: release
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  # Every push to main is released, versioned and tagged by this commit's
+  # own actions. The checkout is only to load them; neither needs it.
+  git-tag:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - id: semver
+        uses: ./auto-semver
+      - if: steps.semver.outputs.tag != ''
+        uses: ./tag
+        with:
+          tags: ${{ steps.semver.outputs.tag }}

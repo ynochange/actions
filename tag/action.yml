@@ -1,0 +1,43 @@
+name: tag
+description: >
+  Creates git tags on a commit through the GitHub API, with no checkout.
+  Supports floating tags, which move, and idempotent re-runs.
+author: ynochange
+
+inputs:
+  token:
+    description: Token for the GitHub API. The job needs permissions contents write.
+    required: false
+    default: ${{ github.token }}
+  sha:
+    description: The commit to tag. Defaults to the one the workflow runs for.
+    required: false
+    default: ""
+  tags:
+    description: >
+      Comma-separated tags to create. Fails if one already exists, unless
+      continue-if-exists is true and it's already at this commit.
+    required: false
+    default: ""
+  floating-tags:
+    description: Comma-separated tags to move to this commit, creating them if need be (e.g. v1, v1.2).
+    required: false
+    default: ""
+  continue-if-exists:
+    description: If true, skip a tag that already exists at this commit, rather than fail. One elsewhere still fails.
+    required: false
+    default: "false"
+  ignore-no-op:
+    description: If true, allow no tags at all; otherwise that fails.
+    required: false
+    default: "false"
+
+outputs:
+  created:
+    description: Comma-separated tags created or moved.
+  skipped:
+    description: Comma-separated tags already at this commit (continue-if-exists only).
+
+runs:
+  using: node24
+  main: index.js
