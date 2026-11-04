@@ -1,0 +1,32 @@
+name: pr-title
+description: >
+  Checks that a pull request's title is a conventional commit subject, since
+  a squash merge makes it the commit auto-semver reads. Reads the title from
+  the event: no API calls and no checkout.
+author: ynochange
+
+inputs:
+  title:
+    description: The title to check. Defaults to the pull request's, from the event.
+    required: false
+    default: ""
+  types:
+    description: Comma-separated allowed types.
+    required: false
+    default: "feat,fix,docs,style,refactor,perf,test,build,ci,chore,revert"
+  scopes:
+    description: Comma-separated allowed scopes. Empty allows any.
+    required: false
+    default: ""
+  require-scope:
+    description: If true, a scope is required.
+    required: false
+    default: "false"
+  subject-pattern:
+    description: A regular expression the subject must match. Empty allows any.
+    required: false
+    default: ""
+
+runs:
+  using: node24
+  main: index.js

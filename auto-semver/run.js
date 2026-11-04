@@ -1,5 +1,5 @@
-import { Bump, applyBump, bumpName, compareVersions, computeBump, parseTag, versionString } from "./semver.js";
-import { commitMessagesSince, countCommits, fetchReleaseTags, resolveBase, tagExists } from "./github.js";
+import { Bump, applyBump, bumpName, compareVersions, computeBump, parseTag, versionString } from "../shared/semver.js";
+import { commitMessagesSince, countCommits, fetchReleaseTags, resolveBase, tagExists } from "../shared/github.js";
 
 const EMPTY = Object.freeze({ version: "", tag: "", bump: "" });
 

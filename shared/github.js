@@ -1,5 +1,5 @@
-// The GitHub REST calls auto-semver makes, through a request function
-// (shared/rest.js) that tests can fake.
+// The GitHub REST calls the actions make, through a request function
+// (rest.js) that tests can fake.
 
 /** Every release tag (vX.Y.Z), lowest first, with the commit it points at. */
 export async function fetchReleaseTags(request, repo, parseTag, compareVersions) {
@@ -32,16 +32,33 @@ export async function resolveBase(request, repo, tag, head) {
   );
 }
 
-/** The full message of every commit after base, up to head. */
-export async function commitMessagesSince(request, repo, base, head) {
-  const messages = [];
+/** Every commit after base, up to head, oldest first: { sha, message }. */
+export async function commitsSince(request, repo, base, head) {
+  const out = [];
   for (let page = 1; ; page++) {
     const { json } = await request(`/repos/${repo}/compare/${base}...${head}?per_page=100&page=${page}`);
     const commits = json.commits ?? [];
-    for (const c of commits) messages.push(c.commit.message);
-    if (commits.length < 100 || messages.length >= json.total_commits) break;
+    for (const c of commits) out.push({ sha: c.sha, message: c.commit.message });
+    if (commits.length < 100 || out.length >= json.total_commits) break;
   }
-  return messages;
+  return out;
+}
+
+/** The full message of every commit after base, up to head. */
+export async function commitMessagesSince(request, repo, base, head) {
+  return (await commitsSince(request, repo, base, head)).map((c) => c.message);
+}
+
+/** The newest commits in head's history, newest first, up to limit. */
+export async function recentCommits(request, repo, head, limit) {
+  const out = [];
+  for (let page = 1; out.length < limit; page++) {
+    const { json } = await request(`/repos/${repo}/commits?sha=${head}&per_page=100&page=${page}`);
+    if (!json || json.length === 0) break;
+    for (const c of json) out.push({ sha: c.sha, message: c.commit.message });
+    if (json.length < 100) break;
+  }
+  return out.slice(0, limit);
 }
 
 /** How many commits head's history has, from the last page of a

@@ -1,0 +1,22 @@
+name: release
+description: >
+  Creates the GitHub release for a vX.Y.Z tag, with notes from the
+  conventional commits since the previous release tag. No checkout needed.
+author: ynochange
+
+inputs:
+  token:
+    description: Token for the GitHub API. The job needs permissions contents write.
+    required: false
+    default: ${{ github.token }}
+  tag:
+    description: The release tag, e.g. v1.2.3. It must exist already.
+    required: true
+
+outputs:
+  url:
+    description: The release's page.
+
+runs:
+  using: node24
+  main: index.js
