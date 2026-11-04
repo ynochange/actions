@@ -35,16 +35,17 @@ export async function sha256(path) {
   return createHash("sha256").update(await readFile(path)).digest("hex");
 }
 
-/** A SHA256SUMS file's text, as sha256sum writes it (sha256sum -c reads it). */
-export function checksumsText(assets) {
-  return assets.map((a) => `${a.sha256}  ${a.name}\n`).join("");
+/** The text of an asset's own <name>.sha256 file, as sha256sum writes it,
+ * so `sha256sum -c <name>.sha256` checks the download beside it. */
+export function checksumText(asset) {
+  return `${asset.sha256}  ${asset.name}\n`;
 }
 
 export function contentType(name) {
   if (name.endsWith(".tar.gz") || name.endsWith(".tgz")) return "application/gzip";
   if (name.endsWith(".zip")) return "application/zip";
   if (name.endsWith(".json")) return "application/json";
-  if (name === "SHA256SUMS" || name.endsWith(".txt")) return "text/plain";
+  if (name.endsWith(".sha256") || name.endsWith(".txt")) return "text/plain";
   return "application/octet-stream";
 }
 

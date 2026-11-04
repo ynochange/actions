@@ -20,7 +20,7 @@ inputs:
     required: false
     default: ""
   checksums:
-    description: If true and there are assets, also attach a SHA256SUMS file.
+    description: If true, attach a <name>.sha256 file beside each asset, which sha256sum -c checks.
     required: false
     default: "true"
   notes-footer:

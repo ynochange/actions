@@ -27,10 +27,18 @@ export function sectionOf({ message }) {
   return "other";
 }
 
-/** The downloads as a table: each file, linked, with its SHA-256. */
+/** The downloads as a table: each file, linked, with its SHA-256 and,
+ * when there is one, a link to its own .sha256 file. */
 export function downloadsTable({ downloads, tag, repo, serverUrl = "https://github.com" }) {
-  const rows = downloads.map((d) => `| [${d.name}](${serverUrl}/${repo}/releases/download/${tag}/${encodeURIComponent(d.name)}) | \`${d.sha256}\` |`);
-  return `## Downloads\n\n| File | SHA-256 |\n|---|---|\n${rows.join("\n")}\n\nCheck one with \`sha256sum -c SHA256SUMS --ignore-missing\`.`;
+  const link = (name) => `${serverUrl}/${repo}/releases/download/${tag}/${encodeURIComponent(name)}`;
+  const files = downloads.some((d) => d.checksumFile);
+  const rows = downloads.map(
+    (d) => `| [${d.name}](${link(d.name)}) | \`${d.sha256}\`${d.checksumFile ? ` ([.sha256](${link(d.name + ".sha256")}))` : ""} |`,
+  );
+  const how = files
+    ? "Check a download with its `.sha256` file beside it: `sha256sum -c <file>.sha256` (on macOS, `shasum -a 256 -c <file>.sha256`)."
+    : "Compare a download's `sha256sum` with the one listed.";
+  return `## Downloads\n\n| File | SHA-256 |\n|---|---|\n${rows.join("\n")}\n\n${how}`;
 }
 
 /** The notes for a release: commits grouped by kind, oldest first within a

@@ -34,8 +34,8 @@ comparing the previous release. A first release lists the newest 100
 commits.
 
 With `assets`, a **Downloads** table links each file with its SHA-256,
-and `SHA256SUMS` is attached so `sha256sum -c SHA256SUMS --ignore-missing`
-checks a download. Then comes `notes-footer`, if given.
+and each file gets its own `<name>.sha256` beside it, so it can be
+downloaded and checked on its own with `sha256sum -c <name>.sha256`. Then comes `notes-footer`, if given.
 
 Running it again for the same tag updates the release, replacing assets
 of the same names.
@@ -45,7 +45,7 @@ of the same names.
 | `token` | `${{ github.token }}` | Needs `contents: write`. |
 | `tag` | | The release tag. It must exist already. |
 | `assets` | | Files to attach, newline- or comma-separated. A `*` in a file name matches any run of characters. A path that matches nothing fails. |
-| `checksums` | `true` | With assets, also attach `SHA256SUMS`, in `sha256sum` format. |
+| `checksums` | `true` | Attach a `<name>.sha256` beside each asset, in `sha256sum` format. |
 | `notes-footer` | | Markdown added after the changes and downloads. |
 
 | Output | |

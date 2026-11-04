@@ -1,7 +1,7 @@
 import { commitsSince, fetchReleaseTags, recentCommits } from "../shared/github.js";
 import { compareVersions, parseTag } from "../shared/semver.js";
 import { renderNotes } from "./notes.js";
-import { checksumsText, sha256, uploadAsset } from "./assets.js";
+import { checksumText, sha256, uploadAsset } from "./assets.js";
 import { readFile } from "node:fs/promises";
 
 // A first release lists at most this many commits.
@@ -10,8 +10,8 @@ const FIRST_RELEASE_LIMIT = 100;
 /** Creates (or, on a re-run, updates) the GitHub release for tag, with
  * notes from the commits since the previous release tag. assets (from
  * resolveAssets) are attached, listed in the notes with their SHA-256, and,
- * with checksums, summed up in an attached SHA256SUMS. footer is markdown
- * added after the changes. */
+ * with checksums, each gets its own <name>.sha256 beside it. footer is
+ * markdown added after the changes. */
 export async function publishRelease({ request, repo, tag, serverUrl, assets = [], checksums = true, footer = "", log = () => {} }) {
   const version = parseTag(tag);
   if (!version) throw new Error(`${tag} isn't a release tag (vX.Y.Z)`);
@@ -31,8 +31,7 @@ export async function publishRelease({ request, repo, tag, serverUrl, assets = [
     log(`First release: ${commits.length} commit(s)`);
   }
   for (const a of assets) a.sha256 = await sha256(a.path);
-  const downloads = [...assets];
-  const sums = checksums && assets.length ? checksumsText(assets) : "";
+  const downloads = assets.map((a) => ({ ...a, checksumFile: checksums }));
   const body = renderNotes({ commits, previous: previous?.name, tag, repo, serverUrl, truncated, downloads, footer });
 
   const existing = await request(`/repos/${repo}/releases/tags/${encodeURIComponent(tag)}`);
@@ -50,10 +49,10 @@ export async function publishRelease({ request, repo, tag, serverUrl, assets = [
   for (const a of assets) {
     await uploadAsset(request, repo, release, a.name, await readFile(a.path));
     log(`Attached ${a.name} (${a.sha256})`);
-  }
-  if (sums) {
-    await uploadAsset(request, repo, release, "SHA256SUMS", Buffer.from(sums));
-    log("Attached SHA256SUMS");
+    if (checksums) {
+      await uploadAsset(request, repo, release, `${a.name}.sha256`, Buffer.from(checksumText(a)));
+      log(`Attached ${a.name}.sha256`);
+    }
   }
   return { url: release.html_url, body };
 }

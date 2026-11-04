@@ -4,7 +4,7 @@ import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
-import { checksumsText, contentType, resolveAssets, sha256 } from "../assets.js";
+import { checksumText, contentType, resolveAssets, sha256 } from "../assets.js";
 
 async function workspace() {
   const dir = await mkdtemp(join(tmpdir(), "assets-"));
@@ -23,25 +23,23 @@ test("paths and wildcards find files, each once, and an empty match fails", asyn
   await assert.rejects(resolveAssets("dist/missing.zip", dir), /no files match/);
 });
 
-test("SHA256SUMS is what sha256sum writes, and it checks", async () => {
+test("each .sha256 file is what sha256sum writes, and it checks", async () => {
   const dir = await workspace();
-  const assets = await resolveAssets("dist/*.tar.gz", dir);
-  for (const a of assets) a.sha256 = await sha256(a.path);
-  const text = checksumsText(assets);
-  assert.match(text, /^[0-9a-f]{64} {2}app_1\.0\.0_darwin_arm64\.tar\.gz\n[0-9a-f]{64} {2}app_1\.0\.0_linux_amd64\.tar\.gz\n$/);
-  await writeFile(join(dir, "dist", "SHA256SUMS"), text);
-  let sumOk = true;
+  const [a] = await resolveAssets("dist/app_1.0.0_linux_amd64.tar.gz", dir);
+  a.sha256 = await sha256(a.path);
+  const text = checksumText(a);
+  assert.match(text, /^[0-9a-f]{64} {2}app_1\.0\.0_linux_amd64\.tar\.gz\n$/);
+  await writeFile(join(dir, "dist", `${a.name}.sha256`), text);
   try {
-    execFileSync("sha256sum", ["-c", "SHA256SUMS"], { cwd: join(dir, "dist"), stdio: "pipe" });
+    execFileSync("sha256sum", ["-c", `${a.name}.sha256`], { cwd: join(dir, "dist"), stdio: "pipe" });
   } catch (e) {
-    if (e.code !== "ENOENT") sumOk = false; // no sha256sum here: nothing to compare with
+    if (e.code !== "ENOENT") throw new Error("sha256sum -c rejected the file"); // no sha256sum here: nothing to compare with
   }
-  assert.ok(sumOk, "sha256sum -c rejected the file");
 });
 
 test("content types by name", () => {
   assert.equal(contentType("a.tar.gz"), "application/gzip");
   assert.equal(contentType("a.zip"), "application/zip");
-  assert.equal(contentType("SHA256SUMS"), "text/plain");
+  assert.equal(contentType("a.tar.gz.sha256"), "text/plain");
   assert.equal(contentType("ynochange"), "application/octet-stream");
 });

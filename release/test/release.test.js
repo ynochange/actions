@@ -41,8 +41,8 @@ test("notes list groups in order, skip empty ones, and link the comparison", () 
 function fakeGitHub({ commits, tags, releases = {} }) {
   const index = new Map(commits.map((x, i) => [x.sha, i]));
   const calls = [];
-  const request = async (path, { method = "GET", body } = {}) => {
-    calls.push({ method, path, body });
+  const request = async (path, { method = "GET", body, raw } = {}) => {
+    calls.push({ method, path, body, raw });
     const url = new URL(/^https?:/.test(path) ? path : "https://api.github.com" + path);
     const p = url.pathname.replace("/repos/o/r", "");
     const page = Number(url.searchParams.get("page") ?? 1);
@@ -108,22 +108,25 @@ test("notes list downloads with their checksums, then the footer", () => {
     previous: "v0.1.0",
     tag: "v0.2.0",
     repo: "o/r",
-    downloads: [{ name: "app_0.2.0_linux_amd64.tar.gz", sha256: "ab".repeat(32) }],
+    downloads: [{ name: "app_0.2.0_linux_amd64.tar.gz", sha256: "ab".repeat(32), checksumFile: true }],
     footer: "## Container image\n\n`ghcr.io/o/r:0.2.0`\n",
   });
-  assert.match(notes, /## Features[\s\S]*## Downloads\n\n\| File \| SHA-256 \|\n\|---\|---\|\n\| \[app_0\.2\.0_linux_amd64\.tar\.gz\]\(https:\/\/github\.com\/o\/r\/releases\/download\/v0\.2\.0\/app_0\.2\.0_linux_amd64\.tar\.gz\) \| `(ab){32}` \|/);
+  assert.match(notes, /## Features[\s\S]*## Downloads\n\n\| File \| SHA-256 \|\n\|---\|---\|\n\| \[app_0\.2\.0_linux_amd64\.tar\.gz\]\(https:\/\/github\.com\/o\/r\/releases\/download\/v0\.2\.0\/app_0\.2\.0_linux_amd64\.tar\.gz\) \| `(ab){32}` \(\[\.sha256\]\(https:\/\/github\.com\/o\/r\/releases\/download\/v0\.2\.0\/app_0\.2\.0_linux_amd64\.tar\.gz\.sha256\)\) \|/);
+  assert.match(notes, /sha256sum -c <file>\.sha256/);
   assert.match(notes, /## Downloads[\s\S]*## Container image[\s\S]*\*\*Full changes:\*\*/);
 });
 
-test("assets are attached with SHA256SUMS, replacing ones from an earlier run", async () => {
+test("assets are attached each with its .sha256, replacing ones from an earlier run", async () => {
   const dir = await mkdtemp(join(tmpdir(), "rel-"));
   const path = join(dir, "app.tar.gz");
   await writeFile(path, "binary");
-  const releases = { "v0.2.0": { id: 7 }, assets: [{ id: 41, name: "app.tar.gz" }, { id: 42, name: "SHA256SUMS" }] };
+  const releases = { "v0.2.0": { id: 7 }, assets: [{ id: 41, name: "app.tar.gz" }, { id: 42, name: "app.tar.gz.sha256" }] };
   const { request, calls } = fakeGitHub({ commits: history, tags: { "v0.1.0": "c0", "v0.2.0": "c2" }, releases });
   const { body } = await publishRelease({ request, repo: "o/r", tag: "v0.2.0", assets: [{ path, name: "app.tar.gz" }] });
   assert.match(body, /\| \[app\.tar\.gz\]/);
   const uploads = calls.filter((x) => x.path.startsWith("https://uploads.github.com/"));
-  assert.deepEqual(uploads.map((x) => new URL(x.path).searchParams.get("name")), ["app.tar.gz", "SHA256SUMS"]);
+  assert.deepEqual(uploads.map((x) => new URL(x.path).searchParams.get("name")), ["app.tar.gz", "app.tar.gz.sha256"]);
+  const sum = uploads[1].raw.toString();
+  assert.match(sum, /^[0-9a-f]{64}  app\.tar\.gz\n$/);
   assert.deepEqual(calls.filter((x) => x.method === "DELETE").map((x) => x.path), ["/repos/o/r/releases/assets/41", "/repos/o/r/releases/assets/42"]);
 });
