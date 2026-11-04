@@ -12,6 +12,21 @@ inputs:
   tag:
     description: The release tag, e.g. v1.2.3. It must exist already.
     required: true
+  assets:
+    description: >
+      Files to attach, newline- or comma-separated, relative to the
+      workspace. A * in a file name matches any run of characters
+      (dist/*.tar.gz). Each is listed in the notes with its SHA-256.
+    required: false
+    default: ""
+  checksums:
+    description: If true and there are assets, also attach a SHA256SUMS file.
+    required: false
+    default: "true"
+  notes-footer:
+    description: Markdown added to the notes after the changes and downloads, e.g. the container image's digest.
+    required: false
+    default: ""
 
 outputs:
   url:

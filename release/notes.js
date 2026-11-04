@@ -27,9 +27,16 @@ export function sectionOf({ message }) {
   return "other";
 }
 
+/** The downloads as a table: each file, linked, with its SHA-256. */
+export function downloadsTable({ downloads, tag, repo, serverUrl = "https://github.com" }) {
+  const rows = downloads.map((d) => `| [${d.name}](${serverUrl}/${repo}/releases/download/${tag}/${encodeURIComponent(d.name)}) | \`${d.sha256}\` |`);
+  return `## Downloads\n\n| File | SHA-256 |\n|---|---|\n${rows.join("\n")}\n\nCheck one with \`sha256sum -c SHA256SUMS --ignore-missing\`.`;
+}
+
 /** The notes for a release: commits grouped by kind, oldest first within a
- * group, then a compare link when there's a previous release. */
-export function renderNotes({ commits, previous, tag, repo, serverUrl = "https://github.com", truncated = false }) {
+ * group; then the downloads with their checksums, and any footer; then a
+ * compare link when there's a previous release. */
+export function renderNotes({ commits, previous, tag, repo, serverUrl = "https://github.com", truncated = false, downloads = [], footer = "" }) {
   const groups = Object.fromEntries(SECTIONS.map(([k]) => [k, []]));
   for (const c of commits) groups[sectionOf(c)].push(noteLine(c));
   const parts = [];
@@ -38,6 +45,8 @@ export function renderNotes({ commits, previous, tag, repo, serverUrl = "https:/
   }
   if (parts.length === 0) parts.push("No changes.");
   if (truncated) parts.push(`Only the newest ${commits.length} commits are listed.`);
+  if (downloads.length) parts.push(downloadsTable({ downloads, tag, repo, serverUrl }));
+  if (footer.trim()) parts.push(footer.trim());
   if (previous) parts.push(`**Full changes:** ${serverUrl}/${repo}/compare/${previous}...${tag}`);
   return parts.join("\n\n") + "\n";
 }

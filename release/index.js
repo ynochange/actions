@@ -1,6 +1,7 @@
 // The action's entry point. No dependencies, so nothing to bundle.
 import { input, restClient, setOutputs } from "../shared/rest.js";
 import { publishRelease } from "./run.js";
+import { resolveAssets } from "./assets.js";
 
 try {
   const token = input("token", process.env.GITHUB_TOKEN ?? "");
@@ -11,7 +12,17 @@ try {
   if (!tag) throw new Error("the tag input is required");
 
   const request = restClient({ token, apiUrl: process.env.GITHUB_API_URL || undefined });
-  const { url } = await publishRelease({ request, repo, tag, serverUrl: process.env.GITHUB_SERVER_URL || undefined, log: console.log });
+  const spec = input("assets");
+  const { url } = await publishRelease({
+    request,
+    repo,
+    tag,
+    serverUrl: process.env.GITHUB_SERVER_URL || undefined,
+    assets: spec ? await resolveAssets(spec) : [],
+    checksums: input("checksums", "true") === "true",
+    footer: process.env["INPUT_NOTES-FOOTER"] ?? "",
+    log: console.log,
+  });
   await setOutputs({ url });
 } catch (err) {
   console.log(`::error::${err.message}`);

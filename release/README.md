@@ -18,18 +18,35 @@ steps:
     uses: ynochange/actions/release@<commit sha>
     with:
       tag: ${{ steps.semver.outputs.tag }}
+      assets: |
+        dist/*.tar.gz
+        dist/*.zip
+      notes-footer: |
+        ## Container image
+
+        `ghcr.io/owner/app:1.2.3`
 ```
 
 The notes group the commits under **Breaking changes**, **Features**,
 **Fixes** and **Other changes**, oldest first, each as its subject without
 the type, the scope in bold, and the short SHA. They end with a link
 comparing the previous release. A first release lists the newest 100
-commits. Running it again for the same tag updates the release.
+commits.
+
+With `assets`, a **Downloads** table links each file with its SHA-256,
+and `SHA256SUMS` is attached so `sha256sum -c SHA256SUMS --ignore-missing`
+checks a download. Then comes `notes-footer`, if given.
+
+Running it again for the same tag updates the release, replacing assets
+of the same names.
 
 | Input | Default | |
 |---|---|---|
 | `token` | `${{ github.token }}` | Needs `contents: write`. |
 | `tag` | | The release tag. It must exist already. |
+| `assets` | | Files to attach, newline- or comma-separated. A `*` in a file name matches any run of characters. A path that matches nothing fails. |
+| `checksums` | `true` | With assets, also attach `SHA256SUMS`, in `sha256sum` format. |
+| `notes-footer` | | Markdown added after the changes and downloads. |
 
 | Output | |
 |---|---|

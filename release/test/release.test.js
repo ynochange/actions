@@ -1,5 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { mkdtemp, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { noteLine, renderNotes, sectionOf } from "../notes.js";
 import { publishRelease } from "../run.js";
 
@@ -40,7 +43,7 @@ function fakeGitHub({ commits, tags, releases = {} }) {
   const calls = [];
   const request = async (path, { method = "GET", body } = {}) => {
     calls.push({ method, path, body });
-    const url = new URL("https://api.github.com" + path);
+    const url = new URL(/^https?:/.test(path) ? path : "https://api.github.com" + path);
     const p = url.pathname.replace("/repos/o/r", "");
     const page = Number(url.searchParams.get("page") ?? 1);
     let m;
@@ -57,8 +60,10 @@ function fakeGitHub({ commits, tags, releases = {} }) {
       const r = releases[decodeURIComponent(m[1])];
       return r ? { status: 200, json: r } : { status: 404, json: null };
     }
-    if (p === "/releases" && method === "POST") return { status: 201, json: { html_url: `https://github.com/o/r/releases/tag/${body.tag_name}` } };
-    if ((m = /^\/releases\/(\d+)$/.exec(p)) && method === "PATCH") return { status: 200, json: { html_url: "https://github.com/o/r/releases/x" } };
+    if (p === "/releases" && method === "POST") return { status: 201, json: { id: 9, html_url: `https://github.com/o/r/releases/tag/${body.tag_name}`, upload_url: "https://uploads.github.com/repos/o/r/releases/9/assets{?name,label}", assets: [] } };
+    if ((m = /^\/releases\/(\d+)$/.exec(p)) && method === "PATCH") return { status: 200, json: { id: Number(m[1]), html_url: "https://github.com/o/r/releases/x", upload_url: `https://uploads.github.com/repos/o/r/releases/${m[1]}/assets{?name,label}`, assets: releases.assets ?? [] } };
+    if (url.host === "uploads.github.com" && method === "POST") return { status: 201, json: { name: url.searchParams.get("name") } };
+    if ((m = /^\/releases\/assets\/(\d+)$/.exec(p)) && method === "DELETE") return { status: 204, json: null };
     throw new Error(`unexpected ${method} ${path}`);
   };
   return { request, calls };
@@ -95,4 +100,30 @@ test("the tag must exist and be a release tag", async () => {
   const { request } = fakeGitHub({ commits: history, tags: { "v0.1.0": "c0" } });
   await assert.rejects(publishRelease({ request, repo: "o/r", tag: "v0.2.0" }), /doesn't exist/);
   await assert.rejects(publishRelease({ request, repo: "o/r", tag: "nightly" }), /isn't a release tag/);
+});
+
+test("notes list downloads with their checksums, then the footer", () => {
+  const notes = renderNotes({
+    commits: [c("1111111", "feat: b")],
+    previous: "v0.1.0",
+    tag: "v0.2.0",
+    repo: "o/r",
+    downloads: [{ name: "app_0.2.0_linux_amd64.tar.gz", sha256: "ab".repeat(32) }],
+    footer: "## Container image\n\n`ghcr.io/o/r:0.2.0`\n",
+  });
+  assert.match(notes, /## Features[\s\S]*## Downloads\n\n\| File \| SHA-256 \|\n\|---\|---\|\n\| \[app_0\.2\.0_linux_amd64\.tar\.gz\]\(https:\/\/github\.com\/o\/r\/releases\/download\/v0\.2\.0\/app_0\.2\.0_linux_amd64\.tar\.gz\) \| `(ab){32}` \|/);
+  assert.match(notes, /## Downloads[\s\S]*## Container image[\s\S]*\*\*Full changes:\*\*/);
+});
+
+test("assets are attached with SHA256SUMS, replacing ones from an earlier run", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "rel-"));
+  const path = join(dir, "app.tar.gz");
+  await writeFile(path, "binary");
+  const releases = { "v0.2.0": { id: 7 }, assets: [{ id: 41, name: "app.tar.gz" }, { id: 42, name: "SHA256SUMS" }] };
+  const { request, calls } = fakeGitHub({ commits: history, tags: { "v0.1.0": "c0", "v0.2.0": "c2" }, releases });
+  const { body } = await publishRelease({ request, repo: "o/r", tag: "v0.2.0", assets: [{ path, name: "app.tar.gz" }] });
+  assert.match(body, /\| \[app\.tar\.gz\]/);
+  const uploads = calls.filter((x) => x.path.startsWith("https://uploads.github.com/"));
+  assert.deepEqual(uploads.map((x) => new URL(x.path).searchParams.get("name")), ["app.tar.gz", "SHA256SUMS"]);
+  assert.deepEqual(calls.filter((x) => x.method === "DELETE").map((x) => x.path), ["/repos/o/r/releases/assets/41", "/repos/o/r/releases/assets/42"]);
 });

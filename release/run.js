@@ -1,13 +1,18 @@
 import { commitsSince, fetchReleaseTags, recentCommits } from "../shared/github.js";
 import { compareVersions, parseTag } from "../shared/semver.js";
 import { renderNotes } from "./notes.js";
+import { checksumsText, sha256, uploadAsset } from "./assets.js";
+import { readFile } from "node:fs/promises";
 
 // A first release lists at most this many commits.
 const FIRST_RELEASE_LIMIT = 100;
 
 /** Creates (or, on a re-run, updates) the GitHub release for tag, with
- * notes from the commits since the previous release tag. */
-export async function publishRelease({ request, repo, tag, serverUrl, log = () => {} }) {
+ * notes from the commits since the previous release tag. assets (from
+ * resolveAssets) are attached, listed in the notes with their SHA-256, and,
+ * with checksums, summed up in an attached SHA256SUMS. footer is markdown
+ * added after the changes. */
+export async function publishRelease({ request, repo, tag, serverUrl, assets = [], checksums = true, footer = "", log = () => {} }) {
   const version = parseTag(tag);
   if (!version) throw new Error(`${tag} isn't a release tag (vX.Y.Z)`);
   const tags = await fetchReleaseTags(request, repo, parseTag, compareVersions);
@@ -25,7 +30,10 @@ export async function publishRelease({ request, repo, tag, serverUrl, log = () =
     commits = recent.slice(0, FIRST_RELEASE_LIMIT).reverse();
     log(`First release: ${commits.length} commit(s)`);
   }
-  const body = renderNotes({ commits, previous: previous?.name, tag, repo, serverUrl, truncated });
+  for (const a of assets) a.sha256 = await sha256(a.path);
+  const downloads = [...assets];
+  const sums = checksums && assets.length ? checksumsText(assets) : "";
+  const body = renderNotes({ commits, previous: previous?.name, tag, repo, serverUrl, truncated, downloads, footer });
 
   const existing = await request(`/repos/${repo}/releases/tags/${encodeURIComponent(tag)}`);
   const fields = { name: tag, body };
@@ -38,5 +46,14 @@ export async function publishRelease({ request, repo, tag, serverUrl, log = () =
     log(`Updated the ${tag} release`);
   }
   if (res.status === 422) throw new Error(`GitHub refused the ${tag} release`);
-  return { url: res.json.html_url, body };
+  const release = res.json;
+  for (const a of assets) {
+    await uploadAsset(request, repo, release, a.name, await readFile(a.path));
+    log(`Attached ${a.name} (${a.sha256})`);
+  }
+  if (sums) {
+    await uploadAsset(request, repo, release, "SHA256SUMS", Buffer.from(sums));
+    log("Attached SHA256SUMS");
+  }
+  return { url: release.html_url, body };
 }
